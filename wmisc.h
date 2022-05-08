@@ -272,17 +272,56 @@ inline std::string convert(const std::wstring_view & wcs)
 
 
 template<typename T, typename U>
-constexpr T narrow_cast(U && u)
+constexpr T narrow(U && u)
 {
-	static_assert(std::is_unsigned<std::remove_reference<T>::type>::value);
-	static_assert(std::is_unsigned<std::remove_reference<U>::type>::value);
+	// 参照を取り除いた型を基に判断
+	using ValueT = std::remove_reference_t<T>;
+	using ValueU = std::remove_reference_t<U>;
 
-	if (u <= std::numeric_limits<T>::max())
+	// 大きい型への変換はコンパイルエラーとする
+	constexpr int DigitsT = std::numeric_limits<ValueT>::digits + std::is_signed<ValueT>::value;
+	constexpr int DigitsU = std::numeric_limits<ValueU>::digits + std::is_signed<ValueU>::value;
+
+	static_assert(DigitsT <= DigitsU);
+
+	if constexpr (DigitsT < DigitsU)
 	{
-		return static_cast<T>(std::forward<U>(u));
+		// 変換先の最小値と最大値
+		constexpr auto min = std::numeric_limits<ValueT>::min();
+		constexpr auto max = std::numeric_limits<ValueT>::max();
+
+		// 変換先と変換元が、それぞれ符号付きかどうか
+		if constexpr (std::is_signed_v<ValueT> && std::is_signed_v<ValueU>)
+		{
+			if (u < min || max < u)
+			{
+				throw std::runtime_error(MACRO_CURRENT_LOCATION());
+			}
+		}
+		else if constexpr (std::is_unsigned_v<ValueT> && std::is_signed_v<ValueU>)
+		{
+			if (u < 0 || ((ValueU) max) < u)
+			{
+				throw std::runtime_error(MACRO_CURRENT_LOCATION());
+			}
+		}
+		else if constexpr (std::is_signed_v<ValueT> && std::is_unsigned_v<ValueU>)
+		{
+			if (((ValueU) max) < u)
+			{
+				throw std::runtime_error(MACRO_CURRENT_LOCATION());
+			}
+		}
+		else
+		{
+			if (max < u)
+			{
+				throw std::runtime_error(MACRO_CURRENT_LOCATION());
+			}
+		}
 	}
 
-	throw std::runtime_error(MACRO_CURRENT_LOCATION());
+	return static_cast<T>(std::forward<U>(u));
 }
 
 
@@ -321,7 +360,7 @@ inline std::wstring GetEnvironmentStringB(const wchar_t * name)
 
 	DWORD size{};
 
-	while ((size = ::GetEnvironmentVariable(name, buf.data(), narrow_cast<DWORD>(buf.size() + 1))) > buf.size())
+	while ((size = ::GetEnvironmentVariable(name, buf.data(), narrow<DWORD>(buf.size() + 1))) > buf.size())
 	{
 		buf.resize(size - 1);
 	}
@@ -348,7 +387,7 @@ inline std::filesystem::path GetModuleFilePath(const std::wstring::size_type n =
 
 	for (;;)
 	{
-		const auto length = ::GetModuleFileName((HINSTANCE) &__ImageBase, buff.data(), narrow_cast<DWORD>(buff.size() + 1));
+		const auto length = ::GetModuleFileName((HINSTANCE) &__ImageBase, buff.data(), narrow<DWORD>(buff.size() + 1));
 		const auto error = ::GetLastError();
 
 		if (length == 0)

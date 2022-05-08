@@ -159,12 +159,58 @@ TEST(GetModuleFilePathTest, BufferSize)
 	}
 }
 
-TEST(NarrowCastTest, Success)
+TEST(NarrowCastTest, Signed)
 {
-	EXPECT_EQ(ULONG_MAX, narrow_cast<DWORD>((size_t) ULONG_MAX));
+	EXPECT_EQ(LONG_MIN, narrow<LONG>((LONG64) LONG_MIN));
+	EXPECT_EQ(LONG_MAX, narrow<LONG>((LONG64) LONG_MAX));
+
+	EXPECT_THROW(narrow<LONG>((LONG64) LONG_MIN - 1), std::runtime_error);
+	EXPECT_THROW(narrow<LONG>((LONG64) LONG_MAX + 1), std::runtime_error);
 }
 
-TEST(NarrowCastTest, Fail)
+TEST(NarrowCastTest, Unsigned)
 {
-	EXPECT_THROW(narrow_cast<DWORD>(((size_t) ULONG_MAX) + 1), std::runtime_error);
+	EXPECT_EQ(0, narrow<ULONG>((ULONG64) 0));
+	EXPECT_EQ(ULONG_MAX, narrow<ULONG>((ULONG64) ULONG_MAX));
+
+	EXPECT_THROW(narrow<ULONG>((ULONG64) -1), std::runtime_error);
+	EXPECT_THROW(narrow<ULONG>((ULONG64) ULONG_MAX + 1), std::runtime_error);
+}
+
+TEST(NarrowCastTest, SignedToUnsigned)
+{
+	EXPECT_EQ(0, narrow<ULONG>((LONG64) 0));
+	EXPECT_EQ(ULONG_MAX, narrow<ULONG>((LONG64) ULONG_MAX));
+
+	EXPECT_THROW(narrow<ULONG>((LONG64) -1), std::runtime_error);
+	EXPECT_THROW(narrow<ULONG>((LONG64) ULONG_MAX + 1), std::runtime_error);
+}
+
+TEST(NarrowCastTest, UnsignedToSigned)
+{
+	EXPECT_EQ(0, narrow<LONG>((ULONG64) 0));
+	EXPECT_EQ(LONG_MAX, narrow<LONG>((ULONG64) LONG_MAX));
+
+	EXPECT_THROW(narrow<LONG>((ULONG64) - 1), std::runtime_error);
+	EXPECT_THROW(narrow<LONG>((ULONG64) LONG_MAX + 1), std::runtime_error);
+}
+
+TEST(NarrowCastTest, None)
+{
+	EXPECT_EQ(0, narrow<LONG>((LONG) 0));
+	EXPECT_EQ(0, narrow<LONG>((ULONG) 0));
+	EXPECT_EQ(0, narrow<ULONG>((LONG) 0));
+	EXPECT_EQ(0, narrow<ULONG>((ULONG) 0));
+
+	EXPECT_EQ(-1, narrow<LONG>((LONG) -1));
+	EXPECT_EQ(-1, narrow<LONG>((ULONG) -1));
+	EXPECT_EQ(-1, narrow<ULONG>((LONG) -1));
+	EXPECT_EQ(-1, narrow<ULONG>((ULONG) -1));
+#if 0
+	// コンパイルエラーとなる
+	EXPECT_EQ(0, narrow<LONG64>((LONG) 0));
+	EXPECT_EQ(0, narrow<LONG64>((ULONG) 0));
+	EXPECT_EQ(0, narrow<ULONG64>((LONG) 0));
+	EXPECT_EQ(0, narrow<ULONG64>((ULONG) 0));
+#endif
 }
